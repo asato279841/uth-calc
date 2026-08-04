@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a1628">
+<title>UTH 勝率計算機</title>
+<style>
+:root{
+  --gold:#c9a227;--gold-l:#f0c84a;--bg:#0a1628;--card:#111d30;--card2:#0e1a2b;
+  --text:#e8e0d0;--muted:#8899aa;--border:rgba(201,162,39,.22);
+  --f-body:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Yu Gothic',Meiryo,system-ui,sans-serif;
+  --f-disp:'Avenir Next Condensed','Helvetica Neue',-apple-system,'Hiragino Sans',system-ui,sans-serif;
+  --f-mono:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{background:var(--bg);color:var(--text);font-family:var(--f-body);}
+.app{min-height:100vh;background:radial-gradient(ellipse at top,#0f2040 0%,#070f1e 60%);padding:22px 15px 48px;max-width:560px;margin:0 auto;}
+.hdr{text-align:center;margin-bottom:20px;}
+.hdr h1{font-family:var(--f-disp);font-size:clamp(1.7rem,6vw,2.6rem);letter-spacing:.06em;background:linear-gradient(135deg,var(--gold-l),var(--gold));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;line-height:1.05;font-weight:700;}
+.hdr .sub{font-size:.7rem;color:var(--muted);margin-top:5px;letter-spacing:.1em;text-transform:uppercase;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:15px;padding:18px;margin-bottom:14px;}
+.lbl{font-size:.8rem;font-weight:700;color:var(--gold);margin-bottom:11px;}
+.numwrap{display:flex;align-items:center;gap:10px;}
+.yen-prefix{font-family:var(--f-mono);font-size:1.3rem;color:var(--muted);}
+input[type=text]{flex:1;background:rgba(0,0,0,.28);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--gold-l);font-family:var(--f-mono);font-size:1.35rem;font-weight:700;outline:none;width:100%;text-align:right;}
+input[type=text]:focus{border-color:rgba(201,162,39,.5);}
+.stepper{display:flex;align-items:center;gap:12px;}
+.stepbtn{width:52px;height:52px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--gold-l);font-size:1.6rem;font-weight:700;cursor:pointer;transition:all .12s;display:flex;align-items:center;justify-content:center;flex-shrink:0;user-select:none;}
+.stepbtn:active{transform:scale(.92);background:rgba(255,255,255,.1);}
+.stepval{flex:1;text-align:center;}
+.stepval .v{font-family:var(--f-mono);font-size:2rem;font-weight:700;color:var(--gold-l);line-height:1;}
+.stepval .k{font-size:.65rem;color:var(--muted);margin-top:3px;}
+.anteslider{margin-top:14px;}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:3px;background:linear-gradient(90deg,var(--gold) 0%,var(--gold) var(--pct,50%),rgba(255,255,255,.12) var(--pct,50%));outline:none;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:24px;height:24px;border-radius:50%;background:#f0c84a;border:3px solid #0a1628;box-shadow:0 2px 8px rgba(0,0,0,.5);cursor:pointer;}
+input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:#f0c84a;border:3px solid #0a1628;cursor:pointer;}
+.ticks{display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:.6rem;color:#667788;margin-top:6px;}
+.bg{display:flex;gap:6px;}
+.bg button{flex:1;padding:11px 4px;border-radius:9px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:var(--muted);font-family:var(--f-body);font-size:.82rem;font-weight:700;cursor:pointer;transition:all .12s;}
+.bg button.on{background:linear-gradient(135deg,#1a3a5c,#0d2a44);border-color:rgba(201,162,39,.5);color:var(--gold-l);}
+.result{background:linear-gradient(135deg,#0d2a44,#0a1e33);border:1px solid rgba(201,162,39,.45);border-radius:16px;padding:22px 18px;margin-bottom:14px;text-align:center;}
+.result .k{font-size:.74rem;color:var(--muted);letter-spacing:.05em;margin-bottom:6px;}
+.result .win{font-family:var(--f-disp);font-size:4rem;font-weight:700;line-height:1;letter-spacing:.02em;}
+.result .sub{font-size:.74rem;color:var(--muted);margin-top:8px;line-height:1.5;}
+.rrow{display:flex;justify-content:space-between;align-items:center;padding:9px 0;font-size:.82rem;border-top:1px solid rgba(255,255,255,.07);}
+.rrow:first-child{border-top:none;}
+.rrow .rk{color:var(--muted);display:flex;align-items:center;gap:6px;}
+.rrow .rv{font-family:var(--f-mono);font-weight:700;}
+.badge{font-size:.6rem;padding:1px 6px;border-radius:4px;background:rgba(120,120,140,.15);color:#99a;border:1px solid rgba(120,120,140,.3);}
+.warn{background:rgba(180,60,30,.15);border:1px solid rgba(220,90,50,.35);border-radius:10px;padding:11px 13px;font-size:.75rem;color:#ffab7a;line-height:1.6;margin-bottom:14px;}
+.note{background:rgba(26,107,60,.1);border:1px solid rgba(45,158,95,.28);border-radius:10px;padding:11px 13px;font-size:.73rem;color:#8cd9a8;line-height:1.65;margin-bottom:14px;}
+.note.info{background:rgba(201,162,39,.08);border-color:rgba(201,162,39,.25);color:#e0c060;}
+.note strong{font-weight:700;}
+.footer{font-size:.66rem;color:#667788;text-align:center;margin-top:16px;line-height:1.6;}
+.hidden{display:none;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="hdr">
+    <h1>UTH 勝率計算機</h1>
+    <div class="sub">Win Probability &amp; Bet Sizing</div>
+  </div>
+
+  <div class="card">
+    <div class="lbl">バンクロール（総資金）</div>
+    <div class="numwrap">
+      <span class="yen-prefix">¥</span>
+      <input type="text" id="bankroll" inputmode="numeric" value="50000" placeholder="50000">
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="lbl">アンティ ＝ ブラインド（10刻み / ¥10〜500）</div>
+    <div class="stepper">
+      <button class="stepbtn" id="anteDown">−</button>
+      <div class="stepval">
+        <div class="v" id="anteVal">¥500</div>
+        <div class="k">ブラインドも同額</div>
+      </div>
+      <button class="stepbtn" id="anteUp">＋</button>
+    </div>
+    <div class="anteslider">
+      <input type="range" id="anteRange" min="10" max="500" step="10" value="500">
+      <div class="ticks"><span>¥10</span><span>¥250</span><span>¥500</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="lbl">プレイ予定ハンド数</div>
+    <div class="bg" id="handsBg"></div>
+  </div>
+
+  <div class="result">
+    <div class="k">勝率（<span id="hLabel">100</span>ハンド後にプラスで終わる確率）</div>
+    <div class="win" id="winPct">48.2%</div>
+    <div class="sub" id="winSub"></div>
+  </div>
+
+  <div class="card hidden" id="bustCard" style="padding:14px 16px;margin-top:-4px">
+    <div class="rrow"><span class="rk">破産を無視した勝率</span><span class="rv" id="winNoBust" style="color:#8899aa"></span></div>
+    <div class="rrow"><span class="rk">破産リスクによる低下</span><span class="rv" id="bustDrop" style="color:#ff8877"></span></div>
+  </div>
+
+  <div class="card">
+    <div class="rrow"><span class="rk">トリップス <span class="badge">任意</span></span><span class="rv" id="tripsVal" style="color:#f0c84a"></span></div>
+    <div class="rrow"><span class="rk">ベース必須投資（アンティ＋ブラインド）</span><span class="rv" id="baseVal"></span></div>
+    <div class="rrow"><span class="rk">1ハンド最大リスク（4x＋トリップス）</span><span class="rv" id="maxRisk" style="color:#ff9977"></span></div>
+    <div class="rrow"><span class="rk">バンクロールに対する最大リスク比</span><span class="rv" id="riskRatio"></span></div>
+  </div>
+
+  <div class="warn hidden" id="warnBox"></div>
+
+  <div class="note info">
+    📌 <strong>ベット額が大きいほど勝率は下がります</strong>。下振れでバンクロールが尽きると予定ハンドを消化できず負け確定になるため。バンクロールに対してベットが大きいほど、この破産リスクで勝率が削られます。
+  </div>
+  <div class="note">
+    💡 逆にベットを小さくすれば破産しにくくなり、勝率は「破産を無視した理論値」に近づきます。ただしハウスエッジは消えないので、ハンドを重ねるほど勝率は50%より下がっていきます。
+  </div>
+
+  <div class="footer">
+    Wizard of Odds の公開データ（ハウスエッジ 2.19%、標準偏差 4.94）に基づく理論値。<br>
+    アンティ・ブラインドは10〜500の10刻み、トリップスは5〜100の5刻み。<br>
+    「勝率」＝ N ハンド打ち切った時点で通算プラス、かつ途中で破産していない確率。
+  </div>
+</div>
+
+<script>
+"use strict";
+var HE=0.02185, SD=4.94;
+
+function normCDF(x){
+  var b1=0.319381530,b2=-0.356563782,b3=1.781477937,b4=-1.821255978,b5=1.330274429,p=0.2316419,c=0.39894228;
+  if(x>=0){var t=1/(1+p*x);return 1-c*Math.exp(-x*x/2)*t*(t*(t*(t*(t*b5+b4)+b3)+b2)+b1);}
+  var t2=1/(1-p*x);return c*Math.exp(-x*x/2)*t2*(t2*(t2*(t2*(t2*b5+b4)+b3)+b2)+b1);
+}
+function winProb(bankroll,ante,hands){
+  if(ante<=0||bankroll<=0) return normCDF(-HE*Math.sqrt(hands)/SD);
+  var mu=-HE*ante, sd=SD*ante, sN=Math.sqrt(hands);
+  var m=mu*hands, s=sd*sN, L=-bankroll;
+  var term1=normCDF(m/s);
+  var expo=2*L*m/(s*s);
+  var corr = expo>700 ? 0 : Math.exp(expo)*normCDF((2*L+m)/s);
+  return Math.max(0, term1-corr);
+}
+function winNoBust(hands){ return normCDF(-HE*Math.sqrt(hands)/SD); }
+function yen(n){ return "¥"+Math.round(n).toLocaleString("ja-JP"); }
+function clampTrips(t){ return Math.max(5,Math.min(100,Math.round(t/5)*5)); }
+
+var state={ bankroll:50000, ante:500, hands:100 };
+var HANDS=[30,50,100,200,300];
+
+function render(){
+  var bk=state.bankroll, ante=state.ante, hands=state.hands;
+  var win=winProb(bk,ante,hands);
+  var wnb=winNoBust(hands);
+  var trips=clampTrips(ante*0.15);
+  var maxRisk=6*ante+trips;
+  var expLoss=HE*ante*hands;
+
+  document.getElementById("anteVal").textContent=yen(ante);
+  document.getElementById("anteRange").value=ante;
+  document.getElementById("anteRange").style.setProperty("--pct",((ante-10)/490*100)+"%");
+  document.getElementById("hLabel").textContent=hands;
+
+  var wEl=document.getElementById("winPct");
+  wEl.textContent=(win*100).toFixed(1)+"%";
+  wEl.style.color = win>=0.5?"#5dca8a":(win>=0.4?"#f0c84a":"#ff8877");
+  document.getElementById("winSub").innerHTML=
+    "負ける確率 "+((1-win)*100).toFixed(1)+"%<br>期待損失の目安 約 "+yen(expLoss);
+
+  var bustCard=document.getElementById("bustCard");
+  if(wnb-win>0.005){
+    bustCard.classList.remove("hidden");
+    document.getElementById("winNoBust").textContent=(wnb*100).toFixed(1)+"%";
+    document.getElementById("bustDrop").textContent="−"+((wnb-win)*100).toFixed(1)+"%";
+  } else { bustCard.classList.add("hidden"); }
+
+  document.getElementById("tripsVal").textContent=yen(trips);
+  document.getElementById("baseVal").textContent=yen(ante+ante);
+  document.getElementById("maxRisk").textContent=yen(maxRisk);
+  document.getElementById("riskRatio").textContent = bk>0 ? (maxRisk/bk*100).toFixed(1)+"%" : "—";
+
+  var warn=document.getElementById("warnBox");
+  if(bk>0 && bk<maxRisk){
+    warn.classList.remove("hidden");
+    warn.innerHTML="⚠️ バンクロール（"+yen(bk)+"）が1ハンドの最大リスク（"+yen(maxRisk)+"）を下回っています。4xレイズできない場面が出るので、<strong>アンティを下げる</strong>か<strong>資金を増やして</strong>ください。";
+  } else { warn.classList.add("hidden"); }
+}
+
+// build hands buttons
+var hbg=document.getElementById("handsBg");
+HANDS.forEach(function(h){
+  var b=document.createElement("button");
+  b.textContent=h; b.dataset.h=h;
+  if(h===state.hands) b.className="on";
+  b.onclick=function(){ state.hands=h; [].forEach.call(hbg.children,function(c){c.className=(Number(c.dataset.h)===h)?"on":"";}); render(); };
+  hbg.appendChild(b);
+});
+
+// bankroll input
+var bkInput=document.getElementById("bankroll");
+bkInput.addEventListener("input",function(){
+  var v=bkInput.value.replace(/[^0-9]/g,"");
+  bkInput.value=v;
+  state.bankroll=Number(v)||0;
+  render();
+});
+
+// ante stepper + slider
+document.getElementById("anteDown").onclick=function(){ state.ante=Math.max(10,state.ante-10); render(); };
+document.getElementById("anteUp").onclick=function(){ state.ante=Math.min(500,state.ante+10); render(); };
+document.getElementById("anteRange").addEventListener("input",function(e){ state.ante=Number(e.target.value); render(); });
+
+render();
+</script>
+</body>
+</html>
