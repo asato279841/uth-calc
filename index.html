@@ -43,8 +43,13 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bac
 .bg button.on{background:linear-gradient(135deg,#1a3a5c,#0d2a44);border-color:rgba(201,162,39,.5);color:var(--gold-l);}
 .result{background:linear-gradient(135deg,#0d2a44,#0a1e33);border:1px solid rgba(201,162,39,.45);border-radius:16px;padding:22px 18px;margin-bottom:14px;text-align:center;}
 .result .k{font-size:.74rem;color:var(--muted);letter-spacing:.05em;margin-bottom:6px;}
-.result .win{font-family:var(--f-disp);font-size:4rem;font-weight:700;line-height:1;letter-spacing:.02em;}
-.result .sub{font-size:.74rem;color:var(--muted);margin-top:8px;line-height:1.5;}
+.winbust{display:flex;align-items:stretch;justify-content:center;gap:0;}
+.wb-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.wb-div{width:1px;background:rgba(255,255,255,.12);margin:4px 8px;}
+.result .win{font-family:var(--f-disp);font-size:3.1rem;font-weight:700;line-height:1;letter-spacing:.02em;}
+.result .bust{font-family:var(--f-disp);font-size:3.1rem;font-weight:700;line-height:1;letter-spacing:.02em;}
+.wb-sub{font-size:.62rem;color:var(--muted);margin-top:6px;}
+.result .sub{font-size:.74rem;color:var(--muted);margin-top:14px;line-height:1.5;padding-top:12px;border-top:1px solid rgba(255,255,255,.07);}
 .rrow{display:flex;justify-content:space-between;align-items:center;padding:9px 0;font-size:.82rem;border-top:1px solid rgba(255,255,255,.07);}
 .rrow:first-child{border-top:none;}
 .rrow .rk{color:var(--muted);display:flex;align-items:center;gap:6px;}
@@ -95,8 +100,19 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bac
   </div>
 
   <div class="result">
-    <div class="k">勝率（<span id="hLabel">100</span>ハンド後にプラスで終わる確率）</div>
-    <div class="win" id="winPct">48.2%</div>
+    <div class="winbust">
+      <div class="wb-col">
+        <div class="k">勝率</div>
+        <div class="win" id="winPct">48.2%</div>
+        <div class="wb-sub"><span id="hLabel">100</span>ハンドでプラス</div>
+      </div>
+      <div class="wb-div"></div>
+      <div class="wb-col">
+        <div class="k">破産率</div>
+        <div class="bust" id="bustPct">4.7%</div>
+        <div class="wb-sub">途中で資金ゼロ</div>
+      </div>
+    </div>
     <div class="sub" id="winSub"></div>
   </div>
 
@@ -106,7 +122,7 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bac
   </div>
 
   <div class="card">
-    <div class="rrow"><span class="rk">トリップス <span class="badge">任意</span></span><span class="rv" id="tripsVal" style="color:#f0c84a"></span></div>
+    <div class="rrow"><span class="rk">トリップス <span class="badge">アンティの20%</span></span><span class="rv" id="tripsVal" style="color:#f0c84a"></span></div>
     <div class="rrow"><span class="rk">ベース必須投資（アンティ＋ブラインド）</span><span class="rv" id="baseVal"></span></div>
     <div class="rrow"><span class="rk">1ハンド最大リスク（4x＋トリップス）</span><span class="rv" id="maxRisk" style="color:#ff9977"></span></div>
     <div class="rrow"><span class="rk">バンクロールに対する最大リスク比</span><span class="rv" id="riskRatio"></span></div>
@@ -115,10 +131,10 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bac
   <div class="warn hidden" id="warnBox"></div>
 
   <div class="note info">
-    📌 <strong>ベット額が大きいほど勝率は下がります</strong>。下振れでバンクロールが尽きると予定ハンドを消化できず負け確定になるため。バンクロールに対してベットが大きいほど、この破産リスクで勝率が削られます。
+    📌 <strong>トリップスをアンティの20%で毎回ベットする前提</strong>で計算しています。トリップスは分散が大きくハウスエッジも高い（3.5%）ため、勝率はやや下がり破産率はやや上がります。
   </div>
   <div class="note">
-    💡 逆にベットを小さくすれば破産しにくくなり、勝率は「破産を無視した理論値」に近づきます。ただしハウスエッジは消えないので、ハンドを重ねるほど勝率は50%より下がっていきます。
+    💡 <strong>ベット額が大きいほど勝率は下がります</strong>。下振れでバンクロールが尽きると予定ハンドを消化できず負け確定になるため。ベットを絞れば破産しにくくなり、勝率は「破産を無視した理論値」に近づきます。
   </div>
 
   <div class="footer">
@@ -130,23 +146,48 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bac
 
 <script>
 "use strict";
-var HE=0.02185, SD=4.94;
+var HE=0.02185, SD=4.94;          // メイン(アンティ基準): ハウスエッジ, 標準偏差
+var TRIPS_EV=-0.0350, TRIPS_SD=2.684; // トリップス1単位: EV(HE3.5%), SD (Blow配当)
+var TRIPS_RATIO=0.20;             // トリップス = アンティの20%
+
+// アンティ a のとき、トリップス込み1ハンドの損益(円)の平均と標準偏差
+function handStats(ante){
+  var t=TRIPS_RATIO*ante;
+  var mean=-HE*ante + TRIPS_EV*t;                       // 円/ハンド
+  var variance=(SD*ante)*(SD*ante) + (TRIPS_SD*t)*(TRIPS_SD*t);
+  return { mean:mean, sd:Math.sqrt(variance) };
+}
 
 function normCDF(x){
   var b1=0.319381530,b2=-0.356563782,b3=1.781477937,b4=-1.821255978,b5=1.330274429,p=0.2316419,c=0.39894228;
   if(x>=0){var t=1/(1+p*x);return 1-c*Math.exp(-x*x/2)*t*(t*(t*(t*(t*b5+b4)+b3)+b2)+b1);}
   var t2=1/(1-p*x);return c*Math.exp(-x*x/2)*t2*(t2*(t2*(t2*(t2*b5+b4)+b3)+b2)+b1);
 }
+// P(通算プラス かつ 途中で破産しない) — トリップス込み
 function winProb(bankroll,ante,hands){
-  if(ante<=0||bankroll<=0) return normCDF(-HE*Math.sqrt(hands)/SD);
-  var mu=-HE*ante, sd=SD*ante, sN=Math.sqrt(hands);
-  var m=mu*hands, s=sd*sN, L=-bankroll;
+  var st=handStats(ante);
+  if(ante<=0||bankroll<=0){ var z=st.mean*hands/(st.sd*Math.sqrt(hands)); return normCDF(z); }
+  var m=st.mean*hands, s=st.sd*Math.sqrt(hands), L=-bankroll;
   var term1=normCDF(m/s);
   var expo=2*L*m/(s*s);
   var corr = expo>700 ? 0 : Math.exp(expo)*normCDF((2*L+m)/s);
   return Math.max(0, term1-corr);
 }
-function winNoBust(hands){ return normCDF(-HE*Math.sqrt(hands)/SD); }
+// 破産を無視した勝率（トリップス込み）
+function winNoBust(ante,hands){
+  var st=handStats(ante);
+  return normCDF(st.mean*hands/(st.sd*Math.sqrt(hands)));
+}
+// N ハンド以内に破産する確率 — トリップス込み
+function bustRate(bankroll,ante,hands){
+  if(ante<=0||bankroll<=0) return 0;
+  var st=handStats(ante), sN=Math.sqrt(hands);
+  var z1=(-bankroll - st.mean*hands)/(st.sd*sN);
+  var z2=(-bankroll + st.mean*hands)/(st.sd*sN);
+  var expo=-2*st.mean*bankroll/(st.sd*st.sd);
+  var t2 = expo>700 ? 0 : Math.exp(expo)*normCDF(z2);
+  return Math.min(1,Math.max(0, normCDF(z1)+t2));
+}
 function yen(n){ return "¥"+Math.round(n).toLocaleString("ja-JP"); }
 function clampTrips(t){ return Math.max(5,Math.min(100,Math.round(t/5)*5)); }
 
@@ -156,10 +197,12 @@ var HANDS=[30,50,100,200,300];
 function render(){
   var bk=state.bankroll, ante=state.ante, hands=state.hands;
   var win=winProb(bk,ante,hands);
-  var wnb=winNoBust(hands);
-  var trips=clampTrips(ante*0.15);
+  var wnb=winNoBust(ante,hands);
+  var bust=bustRate(bk,ante,hands);
+  var trips=clampTrips(ante*TRIPS_RATIO);
   var maxRisk=6*ante+trips;
-  var expLoss=HE*ante*hands;
+  var st=handStats(ante);
+  var expLoss=-st.mean*hands;   // 期待損失(円) トリップス込み
 
   document.getElementById("anteVal").textContent=yen(ante);
   document.getElementById("anteRange").value=ante;
@@ -169,8 +212,13 @@ function render(){
   var wEl=document.getElementById("winPct");
   wEl.textContent=(win*100).toFixed(1)+"%";
   wEl.style.color = win>=0.5?"#5dca8a":(win>=0.4?"#f0c84a":"#ff8877");
+
+  var bEl=document.getElementById("bustPct");
+  bEl.textContent=(bust*100).toFixed(1)+"%";
+  bEl.style.color = bust<=0.05?"#5dca8a":(bust<=0.2?"#f0c84a":"#ff8877");
+
   document.getElementById("winSub").innerHTML=
-    "負ける確率 "+((1-win)*100).toFixed(1)+"%<br>期待損失の目安 約 "+yen(expLoss);
+    "負ける確率 "+((1-win)*100).toFixed(1)+"%　／　期待損失の目安 約 "+yen(expLoss);
 
   var bustCard=document.getElementById("bustCard");
   if(wnb-win>0.005){
