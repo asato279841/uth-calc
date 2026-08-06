@@ -76,8 +76,9 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bac
     <div class="lbl">バンクロール（総資金）</div>
     <div class="numwrap">
       <span class="yen-prefix">¥</span>
-      <input type="text" id="bankroll" inputmode="numeric" value="50000" placeholder="50000">
+      <input type="text" id="bankroll" inputmode="numeric" value="" placeholder="例: 50000">
     </div>
+    <div class="k" style="margin-top:8px;font-size:.68rem;color:var(--muted)">未入力の場合、破産リスクを考慮しない理論勝率のみを表示します</div>
   </div>
 
   <div class="card">
@@ -97,8 +98,15 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bac
   </div>
 
   <div class="card">
-    <div class="lbl">プレイ予定ハンド数</div>
-    <div class="bg" id="handsBg"></div>
+    <div class="lbl">プレイ予定時間</div>
+    <div class="numwrap">
+      <input type="text" id="playMinutes" inputmode="numeric" value="60" placeholder="60">
+      <span class="yen-prefix">分</span>
+    </div>
+    <div class="bg" id="minutesBg" style="margin-top:10px"></div>
+    <div class="k" style="margin-top:10px;font-size:.68rem;color:var(--muted)">
+      平均 <span id="secPerHand">88.2</span>秒/ハンドで換算 → 約 <span id="handsCalc">41</span>ハンド
+    </div>
   </div>
 
   <div class="result">
@@ -142,7 +150,8 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bac
   <div class="footer">
     Wizard of Odds の公開データ（ハウスエッジ 2.19%、標準偏差 4.94）に基づく理論値。<br>
     アンティ・ブラインドは10〜500の10刻み、トリップスは5〜100の5刻み。<br>
-    「勝率」＝ N ハンド打ち切った時点で通算プラス、かつ途中で破産していない確率。
+    「勝率」＝ N ハンド打ち切った時点で通算プラス、かつ途中で破産していない確率。<br>
+    ハンド数はプレイ時間（分）を平均88.2秒/ハンド（実測プレイ履歴76ハンド分の間隔平均）で換算した推定値です。
   </div>
 </div>
 
@@ -193,11 +202,14 @@ function bustRate(bankroll,ante,hands){
 function yen(n){ return "¥"+Math.round(n).toLocaleString("ja-JP"); }
 function clampTrips(t){ return Math.max(5,Math.min(100,Math.round(t/5)*5)); }
 
-var state={ bankroll:50000, ante:500, hands:100 };
-var HANDS=[30,50,100,200,300];
+var SEC_PER_HAND=88.21; // 実測プレイ履歴(76ハンド・75間隔)の平均間隔から算出
+function handsFromMinutes(min){ return Math.max(1,Math.round(min*60/SEC_PER_HAND)); }
+
+var state={ bankroll:0, ante:500, playMinutes:60 };
+var MINUTES=[30,60,90,120,180];
 
 function render(){
-  var bk=state.bankroll, ante=state.ante, hands=state.hands;
+  var bk=state.bankroll, ante=state.ante, hands=handsFromMinutes(state.playMinutes);
   var win=winProb(bk,ante,hands);
   var wnb=winNoBust(ante,hands);
   var bust=bustRate(bk,ante,hands);
@@ -210,17 +222,24 @@ function render(){
   document.getElementById("anteRange").value=ante;
   document.getElementById("anteRange").style.setProperty("--pct",((ante-10)/490*100)+"%");
   document.getElementById("hLabel").textContent=hands;
+  document.getElementById("handsCalc").textContent=hands;
 
   var wEl=document.getElementById("winPct");
   wEl.textContent=(win*100).toFixed(1)+"%";
   wEl.style.color = win>=0.5?"#5dca8a":(win>=0.4?"#f0c84a":"#ff8877");
 
   var bEl=document.getElementById("bustPct");
-  bEl.textContent=(bust*100).toFixed(1)+"%";
-  bEl.style.color = bust<=0.05?"#5dca8a":(bust<=0.2?"#f0c84a":"#ff8877");
+  if(bk>0){
+    bEl.textContent=(bust*100).toFixed(1)+"%";
+    bEl.style.color = bust<=0.05?"#5dca8a":(bust<=0.2?"#f0c84a":"#ff8877");
+  } else {
+    bEl.textContent="—";
+    bEl.style.color="#8899aa";
+  }
 
-  document.getElementById("winSub").innerHTML=
-    "負ける確率 "+((1-win)*100).toFixed(1)+"%　／　期待損失の目安 約 "+yen(expLoss);
+  document.getElementById("winSub").innerHTML = bk>0
+    ? "負ける確率 "+((1-win)*100).toFixed(1)+"%　／　期待損失の目安 約 "+yen(expLoss)
+    : "バンクロール未入力のため破産リスク抜きの理論勝率です　／　期待損失の目安 約 "+yen(expLoss);
 
   var bustCard=document.getElementById("bustCard");
   if(wnb-win>0.005){
@@ -241,14 +260,27 @@ function render(){
   } else { warn.classList.add("hidden"); }
 }
 
-// build hands buttons
-var hbg=document.getElementById("handsBg");
-HANDS.forEach(function(h){
+// build play-time preset buttons
+var mbg=document.getElementById("minutesBg");
+function syncMinutesButtons(){
+  [].forEach.call(mbg.children,function(c){c.className=(Number(c.dataset.m)===state.playMinutes)?"on":"";});
+}
+MINUTES.forEach(function(m){
   var b=document.createElement("button");
-  b.textContent=h; b.dataset.h=h;
-  if(h===state.hands) b.className="on";
-  b.onclick=function(){ state.hands=h; [].forEach.call(hbg.children,function(c){c.className=(Number(c.dataset.h)===h)?"on":"";}); render(); };
-  hbg.appendChild(b);
+  b.textContent=m+"分"; b.dataset.m=m;
+  if(m===state.playMinutes) b.className="on";
+  b.onclick=function(){ state.playMinutes=m; playInput.value=m; syncMinutesButtons(); render(); };
+  mbg.appendChild(b);
+});
+
+// play-time input
+var playInput=document.getElementById("playMinutes");
+playInput.addEventListener("input",function(){
+  var v=playInput.value.replace(/[^0-9]/g,"");
+  playInput.value=v;
+  state.playMinutes=Math.max(1,Number(v)||0);
+  syncMinutesButtons();
+  render();
 });
 
 // bankroll input
