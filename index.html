@@ -43,6 +43,9 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bac
 .bg{display:flex;gap:6px;}
 .bg button{flex:1;padding:11px 4px;border-radius:9px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:var(--muted);font-family:var(--f-body);font-size:.82rem;font-weight:700;cursor:pointer;transition:all .12s;}
 .bg button.on{background:linear-gradient(135deg,#1a3a5c,#0d2a44);border-color:rgba(201,162,39,.5);color:var(--gold-l);}
+select{-webkit-appearance:none;appearance:none;width:100%;background:rgba(0,0,0,.28) url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="8"><path d="M1 1l6 6 6-6" stroke="%23c9a227" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>') no-repeat right 14px center;border:1px solid var(--border);border-radius:10px;padding:12px 40px 12px 14px;color:var(--gold-l);font-family:var(--f-mono);font-size:1.15rem;font-weight:700;outline:none;}
+select:focus{border-color:rgba(201,162,39,.5);}
+select option{background:#111d30;color:var(--text);}
 .result{background:linear-gradient(135deg,#0d2a44,#0a1e33);border:1px solid rgba(201,162,39,.45);border-radius:16px;padding:22px 18px;margin-bottom:14px;text-align:center;}
 .result .k{font-size:.74rem;color:var(--muted);letter-spacing:.05em;margin-bottom:6px;}
 .winbust{display:flex;align-items:stretch;justify-content:center;gap:0;}
@@ -98,12 +101,23 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bac
   </div>
 
   <div class="card">
-    <div class="lbl">プレイ予定時間</div>
-    <div class="numwrap">
-      <input type="text" id="playMinutes" inputmode="numeric" value="60" placeholder="60">
-      <span class="yen-prefix">分</span>
-    </div>
-    <div class="bg" id="minutesBg" style="margin-top:10px"></div>
+    <div class="lbl">プレイ予定時間（最大12時間）</div>
+    <select id="playHours">
+      <option value="0.5">30分</option>
+      <option value="1" selected>1時間</option>
+      <option value="1.5">1.5時間</option>
+      <option value="2">2時間</option>
+      <option value="3">3時間</option>
+      <option value="4">4時間</option>
+      <option value="5">5時間</option>
+      <option value="6">6時間</option>
+      <option value="7">7時間</option>
+      <option value="8">8時間</option>
+      <option value="9">9時間</option>
+      <option value="10">10時間</option>
+      <option value="11">11時間</option>
+      <option value="12">12時間</option>
+    </select>
     <div class="k" style="margin-top:10px;font-size:.68rem;color:var(--muted)">
       平均 <span id="secPerHand">88.2</span>秒/ハンドで換算 → 約 <span id="handsCalc">41</span>ハンド
     </div>
@@ -151,7 +165,7 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bac
     Wizard of Odds の公開データ（ハウスエッジ 2.19%、標準偏差 4.94）に基づく理論値。<br>
     アンティ・ブラインドは10〜500の10刻み、トリップスは5〜100の5刻み。<br>
     「勝率」＝ N ハンド打ち切った時点で通算プラス、かつ途中で破産していない確率。<br>
-    ハンド数はプレイ時間（分）を平均88.2秒/ハンド（実測プレイ履歴76ハンド分の間隔平均）で換算した推定値です。
+    ハンド数はプレイ時間（時間）を平均88.2秒/ハンド（実測プレイ履歴76ハンド分の間隔平均）で換算した推定値です。
   </div>
 </div>
 
@@ -203,13 +217,12 @@ function yen(n){ return "¥"+Math.round(n).toLocaleString("ja-JP"); }
 function clampTrips(t){ return Math.max(5,Math.min(100,Math.round(t/5)*5)); }
 
 var SEC_PER_HAND=88.21; // 実測プレイ履歴(76ハンド・75間隔)の平均間隔から算出
-function handsFromMinutes(min){ return Math.max(1,Math.round(min*60/SEC_PER_HAND)); }
+function handsFromHours(hr){ return Math.max(1,Math.round(hr*3600/SEC_PER_HAND)); }
 
-var state={ bankroll:0, ante:500, playMinutes:60 };
-var MINUTES=[30,60,90,120,180];
+var state={ bankroll:0, ante:500, playHours:1 };
 
 function render(){
-  var bk=state.bankroll, ante=state.ante, hands=handsFromMinutes(state.playMinutes);
+  var bk=state.bankroll, ante=state.ante, hands=handsFromHours(state.playHours);
   var win=winProb(bk,ante,hands);
   var wnb=winNoBust(ante,hands);
   var bust=bustRate(bk,ante,hands);
@@ -260,26 +273,10 @@ function render(){
   } else { warn.classList.add("hidden"); }
 }
 
-// build play-time preset buttons
-var mbg=document.getElementById("minutesBg");
-function syncMinutesButtons(){
-  [].forEach.call(mbg.children,function(c){c.className=(Number(c.dataset.m)===state.playMinutes)?"on":"";});
-}
-MINUTES.forEach(function(m){
-  var b=document.createElement("button");
-  b.textContent=m+"分"; b.dataset.m=m;
-  if(m===state.playMinutes) b.className="on";
-  b.onclick=function(){ state.playMinutes=m; playInput.value=m; syncMinutesButtons(); render(); };
-  mbg.appendChild(b);
-});
-
-// play-time input
-var playInput=document.getElementById("playMinutes");
-playInput.addEventListener("input",function(){
-  var v=playInput.value.replace(/[^0-9]/g,"");
-  playInput.value=v;
-  state.playMinutes=Math.max(1,Number(v)||0);
-  syncMinutesButtons();
+// play-time dropdown
+var hoursSelect=document.getElementById("playHours");
+hoursSelect.addEventListener("change",function(){
+  state.playHours=Number(hoursSelect.value);
   render();
 });
 
